@@ -231,8 +231,3 @@ Here are the estimated minimum and recommended specifications:
 *   ⬜️ **Input Audio Device Selection:** Allow users to choose the microphone input device from within the application.
 *   ⬜️ **"Type Directly" Mode:** An option to type directly into the application instead of pasting, for contexts where auto-paste might be problematic.
 *   ⬜️ **Packaging:** Create distributable executables for major OS (Windows, macOS, Linux).
-
-
-
-
-![AXO](https://media-hosting.imagekit.io/e5512e1be2d049a4/AXO%20BANNERS.png?Expires=1841938236&Key-Pair-Id=K2ZIVPTIP2VGHC&Signature=I~SkUvDZpyDmGUGaW1GEd~kwMBSv1Oq-cdbuRW3spqjEpBFMTIzsRbiLPzL4Qo9vtJEqo1lftn1ijBdbnQ0Zf74v1BEIPU-F6c~DKGdOkL-2xn9agQdgG0hEoYp393tWWogpJ~M4FqVlcPPpUoFemEYrk0xcmfdcDAvDl9zJI3~a8UX9NOnLyMJNAmkxDVE7oFbnUN6BgqamrFG97D95Rr2FtiZcKd5mRfgabmZMl-2JQSXI2AN1oZcE4IuflFK8CmHc0DFon2rtv4Q8bDZ35Um8mBVEjdWrvlxi2u5gcptW51LA3jvXU6Pv39ROP4AjNFCRfcC1K1JCVEZkjQrYNg__)
