@@ -216,10 +216,11 @@ Here are the estimated minimum and recommended specifications:
 *   ✅ Real-time audio input visualization.
 *   ✅ Draggable, always-on-top UI.
 *   ✅ Persistent configuration via `config.json`.
+*   ✅ **Gemini Integration:** Add support for Google's Gemini models as an alternative text processing backend. (New)
 
 ### Future Enhancements (Planned)
 
-*   ⬜️ **Gemini Integration:** Add support for Google's Gemini models as an alternative text processing backend.
+*   ⬜️ **Email Mode:** Add new operation mode that write a clean email based on what you said.
 *   ⬜️ **Expanded Model Selection:**
     *   Allow users to choose from a list of compatible ASR models.
     *   Provide options for different Mistral/Gemini model versions (e.g., small, medium, large) for varying speed/accuracy/cost trade-offs.
