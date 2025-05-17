@@ -6,6 +6,7 @@
 <!-- Example of how to embed an image (replace with an actual screenshot if available)https://i.ibb.co/m5NgFLv6/AXO-BANNER.png https://i.ibb.co/bgnJBKtg/Axo-Image.png-->
 ![Axo Image](https://i.ibb.co/bgnJBKtg/Axo-Image.png)
 
+
 ## Description
 
 Axo is a desktop application designed to streamline your workflow by providing powerful voice dictation, intelligent text refinement, and AI prompt engineering capabilities. It listens to your voice, transcribes it using NVIDIA's NeMo ASR, and then leverages Large Language Models (currently Mistral AI) to correct, translate, or transform your speech into effective prompts for other AI systems.
@@ -43,6 +44,9 @@ The application features a minimalist, draggable UI with real-time audio visuali
         *   **Prompt Engineer Mode:** The raw text is interpreted to generate a structured XML prompt for another AI.
 5.  **Output:** The processed text is copied to the clipboard and an attempt is made to paste it into the currently active application.
 
+<p>
+  <img src="https://github.com/user-attachments/assets/7d43f1ab-4a08-4776-a2d8-9e7607131f42"  width="640" />
+</p>
 
 ## PC Specifications:
 
