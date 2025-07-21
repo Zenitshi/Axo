@@ -9,7 +9,7 @@ import time
 import os
 import json
 import re
-from typing import Generator, Dict, Any, Optional
+from typing import Generator, Dict, Any, Optional, List
 import threading
 
 MODEL_NAME = "nvidia/parakeet-tdt-0.6b-v2"
@@ -450,6 +450,11 @@ def transcribe_and_refine_audio_data(app, frames_to_process):
                     final_text_to_output = process_text_with_mistral(app, transcribed_text)
                 elif text_processing_service == "Gemini" and app.gemini_model_instance:
                     final_text_to_output = process_text_with_gemini(app, transcribed_text)
+                elif text_processing_service == "Ollama":
+                    # Initialize Ollama manager if not already done
+                    if not hasattr(app, 'ollama_manager'):
+                        initialize_ollama_manager(app)
+                    final_text_to_output = process_text_with_ollama(app, transcribed_text)
                 elif text_processing_service == "None (Raw ASR)":
                     print("Using raw ASR output.")
                     final_text_to_output = transcribed_text
@@ -704,6 +709,11 @@ def start_streaming_text_processing(app, transcribed_text: str):
                 stream_generator = stream_mistral_text_processing(app, transcribed_text, operation_mode)
             elif text_processing_service == "Gemini":
                 stream_generator = stream_gemini_text_processing(app, transcribed_text, operation_mode)
+            elif text_processing_service == "Ollama":
+                # Initialize Ollama manager if not already done
+                if not hasattr(app, 'ollama_manager'):
+                    initialize_ollama_manager(app)
+                stream_generator = stream_ollama_text_processing(app, transcribed_text, operation_mode)
             else:
                 # Fallback to batch processing
                 result = process_text_with_mistral(app, transcribed_text, operation_mode)
@@ -725,3 +735,176 @@ def start_streaming_text_processing(app, transcribed_text: str):
     # Start streaming in a separate thread
     streaming_thread = threading.Thread(target=streaming_worker, daemon=True)
     streaming_thread.start() 
+
+class OllamaManager:
+    """Manager for Ollama integration - detection and model listing."""
+    
+    def __init__(self):
+        self.base_url = "http://localhost:11434"
+        self.is_available = False
+        self.client = None
+        
+    def detect_ollama(self) -> bool:
+        """Check if Ollama is installed and running."""
+        try:
+            import requests
+            response = requests.get(f"{self.base_url}/api/version", timeout=5)
+            if response.status_code == 200:
+                self.is_available = True
+                try:
+                    import ollama
+                    self.client = ollama.Client(host=self.base_url)
+                except ImportError:
+                    print("Ollama Python library not installed. Run: pip install ollama")
+                    self.is_available = False
+                return self.is_available
+        except (requests.exceptions.ConnectionError, ImportError) as e:
+            print(f"Ollama not available: {e}")
+            self.is_available = False
+        return False
+        
+    def get_available_models(self) -> List[Dict[str, str]]:
+        """Get list of available Ollama models."""
+        if not self.is_available or not self.client:
+            return []
+        
+        try:
+            import requests
+            response = requests.get(f"{self.base_url}/api/tags", timeout=10)
+            if response.status_code == 200:
+                data = response.json()
+                models = []
+                for model in data.get('models', []):
+                    # Extract model name and remove tag if it's just ":latest"
+                    model_name = model['name']
+                    if model_name.endswith(':latest'):
+                        model_name = model_name[:-7]  # Remove ":latest"
+                    models.append({
+                        'name': model_name,
+                        'full_name': model['name'],  # Keep full name with tag
+                        'size': self._format_size(model.get('size', 0)),
+                        'modified': model.get('modified_at', 'Unknown')
+                    })
+                return models
+        except Exception as e:
+            print(f"Error getting Ollama models: {e}")
+        return []
+    
+    def _format_size(self, size_bytes: int) -> str:
+        """Format size in bytes to human readable format."""
+        if size_bytes == 0:
+            return "Unknown"
+        
+        for unit in ['B', 'KB', 'MB', 'GB', 'TB']:
+            if size_bytes < 1024.0:
+                return f"{size_bytes:.1f} {unit}"
+            size_bytes /= 1024.0
+        return f"{size_bytes:.1f} PB"
+
+
+def initialize_ollama_manager(app):
+    """Initialize Ollama manager for the application."""
+    if not hasattr(app, 'ollama_manager'):
+        app.ollama_manager = OllamaManager()
+        app.ollama_manager.detect_ollama()
+
+
+def stream_ollama_text_processing(app, text: str, operation_mode: str) -> Generator[Dict[str, Any], None, None]:
+    """
+    Stream text processing with Ollama using the selected model.
+    
+    Args:
+        app: The application instance
+        text: The transcribed text to process
+        operation_mode: The operation mode (typer, prompt_engineer, email)
+    
+    Yields:
+        Dict containing streaming data with keys: 'type', 'content'
+    """
+    if not hasattr(app, 'ollama_manager') or not app.ollama_manager.is_available:
+        yield {"type": "error", "content": "Ollama not available or not initialized"}
+        return
+    
+    # Get selected Ollama model from config
+    ollama_model = app.config.get("models_config", {}).get("ollama_model_name", "")
+    if not ollama_model:
+        yield {"type": "error", "content": "No Ollama model selected"}
+        return
+    
+    # Generate prompt based on operation mode
+    language_code = app.config.get("language_config", {}).get("target_language", "en")
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
+    
+    full_prompt = f"{system_prompt}\n\n{mode_instructions}\n\n{user_content_header}\n{text}\n{user_content_footer}"
+    
+    try:
+        import ollama
+        
+        # Stream response from Ollama
+        stream = ollama.chat(
+            model=ollama_model,
+            messages=[{
+                'role': 'user',
+                'content': full_prompt
+            }],
+            stream=True,
+        )
+        
+        for chunk in stream:
+            content = chunk.get('message', {}).get('content', '')
+            if content:
+                yield {
+                    "type": "token",
+                    "content": content
+                }
+        
+        yield {"type": "final"}
+        
+    except Exception as e:
+        yield {"type": "error", "content": f"Ollama streaming error: {str(e)}"}
+
+
+def process_text_with_ollama(app, text: str) -> str:
+    """
+    Process text with Ollama (non-streaming) as fallback.
+    
+    Args:
+        app: The application instance
+        text: The transcribed text to process
+    
+    Returns:
+        str: The processed text result
+    """
+    if not hasattr(app, 'ollama_manager') or not app.ollama_manager.is_available:
+        return f"Error: Ollama not available"
+    
+    operation_mode = app.config.get("mode_config", {}).get("operation_mode", "typer")
+    language_code = app.config.get("language_config", {}).get("target_language", "en")
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
+    
+    ollama_model = app.config.get("models_config", {}).get("ollama_model_name", "")
+    if not ollama_model:
+        return "Error: No Ollama model selected"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
+    
+    full_prompt = f"{system_prompt}\n\n{mode_instructions}\n\n{user_content_header}\n{text}\n{user_content_footer}"
+    
+    try:
+        import ollama
+        
+        response = ollama.chat(
+            model=ollama_model,
+            messages=[{
+                'role': 'user',
+                'content': full_prompt
+            }]
+        )
+        
+        return response['message']['content']
+        
+    except Exception as e:
+        return f"Error processing with Ollama: {str(e)}" 

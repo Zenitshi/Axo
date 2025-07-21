@@ -76,6 +76,10 @@ class AxoApp:
         self.gemini_model_instance = None
         initialize_gemini_client(self)
 
+        # Initialize Ollama manager
+        from backend.ai import initialize_ollama_manager
+        initialize_ollama_manager(self)
+
         try:
             current_theme = ctk.ThemeManager.get_theme()
             self.accent_color = current_theme["CTkButton"]["fg_color"][1] if isinstance(current_theme["CTkButton"]["fg_color"], (list, tuple)) else current_theme["CTkButton"]["fg_color"]

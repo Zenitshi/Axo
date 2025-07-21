@@ -16,7 +16,7 @@ The application features a minimalist, draggable UI with real-time audio visuali
 ## Key Features
 
 *   **High-Quality Speech-to-Text:** Utilizes NVIDIA NeMo ASR (`parakeet-tdt-0.6b-v2`) for accurate transcription.
-*   **Intelligent Text Refinement (via Mistral AI & Gemini):**
+*   **Intelligent Text Refinement (via Mistral AI, Gemini & Ollama):**
     *   **Typer Mode:** Corrects ASR errors (stutters, misspellings), adds punctuation, translates to your target language, preserves original meaning and style, and formats lists (e.g., bullet points).
     *   **Prompt Engineer Mode:** Transforms your spoken ideas into well-structured XML prompts optimized for other advanced AI models (e.g., GPT-4, Gemini, Claude).
     *   **Email Mode:** Transforms your spoken input into professionally formatted emails with proper structure, salutations, and closing.
@@ -25,8 +25,9 @@ The application features a minimalist, draggable UI with real-time audio visuali
 *   **Global Hotkeys:**
     *   `Ctrl + Shift + Space`: Start/Stop recording.
     *   `Ctrl + Shift + H`: Open settings dialog.
+    *   `Ctrl + Shift + X`: Toggle UI visibility (hide/show).
 *   **Configuration Panel:**
-    *   Set API keys (Mistral, Gemini).
+    *   Set API keys (Mistral, Gemini) or use local Ollama models.
     *   Choose operation mode (Typer, Prompt Engineer, Email).
     *   Select target language for output (16 languages supported including English, Arabic, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Hindi, Dutch, Polish, Turkish, Swedish).
     *   Configure streaming options for real-time text processing.
@@ -158,7 +159,13 @@ Here are the estimated minimum and recommended specifications:
 4.  **Configure Axo:**
     *   When you first run Axo, or if `config.json` is missing, it will be created with default settings.
     *   Open Axo and press `Ctrl + Shift + H` to open the settings.
-    *   **API Keys:** Go to the "Models" tab and enter your Mistral API key if you wish to use the text refinement features. The Gemini API key field is for future integration.
+    *   **API Keys:** Go to the "Models" tab and enter your Mistral or Gemini API keys if you wish to use cloud-based text refinement features. Alternatively, install Ollama for local processing.
+    *   **Ollama Setup (Optional):** For local AI processing:
+        1. Download and install [Ollama](https://ollama.com/)
+        2. Install Python library: `pip install ollama`
+        3. Pull a model: `ollama pull llama3.2` (or any supported model)
+        4. In the Models tab, the Ollama model list will be blank until you refresh and have at least one model downloaded. If you have only one, it will be picked automatically. There is no default model.
+        5. Select "Ollama" as your text processing service in the Models tab
     *   **Mode & Language:** Configure your preferred operation mode and output language.
     *   Save settings. Your `config.json` will be updated.
 
@@ -170,9 +177,10 @@ Here are the estimated minimum and recommended specifications:
         "gemini": "YOUR_GEMINI_API_KEY"
       },
       "models_config": {
-        "text_processing_service": "Mistral", // "Mistral", "Gemini", or "None (Raw ASR)"
+        "text_processing_service": "Mistral", // "Mistral", "Gemini", "Ollama", or "None (Raw ASR)"
         "mistral_model_name": "mistral-medium-latest",
         "gemini_model_name": "gemini-2.0-flash",
+        "ollama_model_name": "", // Local Ollama model (Blank unless you have downloaded a model)
         "mistral_custom_models": ["mistral-large-latest"],
         "gemini_custom_models": ["gemini-2.5-flash-preview-05-20"]
       },
@@ -234,6 +242,7 @@ Here are the estimated minimum and recommended specifications:
 *   ✅ **Email Mode:** Transform speech into professionally formatted emails with proper structure.
 *   ✅ **Real-time Streaming:** View AI processing results as they are generated, token by token.
 *   ✅ **Gemini Integration:** Full support for Google's Gemini models as text processing backend.
+*   ✅ **Ollama Integration:** Full support for local AI models including streaming, all operation modes, and language processing.
 *   ✅ Configurable target language for output.
 *   ✅ Global hotkeys for recording (`Ctrl+Shift+Space`) and settings (`Ctrl+Shift+H`).
 *   ✅ **Customizable Hotkeys:** Full hotkey customization through the settings UI.

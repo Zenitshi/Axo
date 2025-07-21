@@ -1,6 +1,6 @@
 import json
 import os
-from backend.ai import initialize_mistral_client, initialize_gemini_client
+from backend.ai import initialize_mistral_client, initialize_gemini_client, initialize_ollama_manager
 
 CONFIG_FILE = "config.json"
 DEFAULT_MISTRAL_MODEL_NAME = "mistral-medium-latest"
@@ -13,6 +13,7 @@ def load_config():
             "text_processing_service": "Mistral",
             "mistral_model_name": DEFAULT_MISTRAL_MODEL_NAME,
             "gemini_model_name": DEFAULT_GEMINI_MODEL_NAME,
+            "ollama_model_name": "",  # No default model
             "mistral_custom_models": [],
             "gemini_custom_models": []
         },
@@ -61,5 +62,6 @@ def save_config(app):
         app.gemini_api_key = app.config.get("api_keys", {}).get("gemini")
         initialize_mistral_client(app)
         initialize_gemini_client(app)
+        initialize_ollama_manager(app)
     except Exception as e:
         print(f"Error saving {CONFIG_FILE}: {e}") 

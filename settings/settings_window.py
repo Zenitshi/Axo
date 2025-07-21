@@ -49,7 +49,7 @@ def open_settings_dialog(app):
     models_frame.pack(pady=10, padx=10, fill="both", expand=True)
     ctk.CTkLabel(models_frame, text="Text Refinement Service:").pack(anchor="w")
     app.service_var = ctk.StringVar(value=app.config.get("models_config", {}).get("text_processing_service", "Mistral"))
-    service_menu = ctk.CTkOptionMenu(models_frame, variable=app.service_var, values=["Mistral", "Gemini", "None (Raw ASR)"])
+    service_menu = ctk.CTkOptionMenu(models_frame, variable=app.service_var, values=["Mistral", "Gemini", "Ollama", "None (Raw ASR)"])
     service_menu.pack(fill="x", pady=(0,10))
     
     mistral_config_frame = ctk.CTkFrame(models_frame, fg_color="transparent")
@@ -82,6 +82,70 @@ def open_settings_dialog(app):
     app.new_gemini_model_entry.pack(side="left", fill="x", expand=True, padx=(0,5), pady=(0,5))
     add_gemini_btn = ctk.CTkButton(gemini_config_frame, text="Add", width=40, command=lambda: add_custom_model(app, "gemini"))
     add_gemini_btn.pack(side="left", pady=(0,5))
+
+    # Ollama Configuration
+    ollama_config_frame = ctk.CTkFrame(models_frame, fg_color="transparent")
+    ollama_config_frame.pack(fill="x", pady=(5,0))
+    icon_size = (20, 20)
+    mistral_icon_image, gemini_icon_image, ollama_icon_image = None, None, None
+    try:
+        mistral_img_path = os.path.join(ASSETS_DIR, "mistral.png")
+        if os.path.exists(mistral_img_path): mistral_icon_image = ctk.CTkImage(Image.open(mistral_img_path), size=icon_size)
+    except Exception as e: print(f"Could not load mistral.png: {e}")
+    try:
+        gemini_img_path = os.path.join(ASSETS_DIR, "gemini.png")
+        if os.path.exists(gemini_img_path): gemini_icon_image = ctk.CTkImage(Image.open(gemini_img_path), size=icon_size)
+    except Exception as e: print(f"Could not load gemini.png: {e}")
+    try:
+        ollama_img_path = os.path.join(ASSETS_DIR, "ollama.png")
+        if os.path.exists(ollama_img_path): ollama_icon_image = ctk.CTkImage(Image.open(ollama_img_path), size=icon_size)
+    except Exception as e: print(f"Could not load ollama.png: {e}")
+    if ollama_icon_image:
+        ctk.CTkLabel(ollama_config_frame, image=ollama_icon_image, text="").pack(side="left", padx=(0, 5), pady=(0,5))
+    ctk.CTkLabel(ollama_config_frame, text="Ollama Model:").pack(side="left", padx=(0, 5), pady=(0,5))
+    
+    # Initialize Ollama manager and get models
+    if not hasattr(app, 'ollama_manager'):
+        from backend.ai import initialize_ollama_manager
+        initialize_ollama_manager(app)
+    
+    ollama_models = []
+    if hasattr(app, 'ollama_manager') and app.ollama_manager.is_available:
+        ollama_models = [model['name'] for model in app.ollama_manager.get_available_models()]
+    
+    if not ollama_models:
+        ollama_models = ["No models available"]
+    
+    selected_ollama_model = models_conf.get("ollama_model_name", ollama_models[0] if ollama_models and ollama_models[0] != "No models available" else "")
+    if selected_ollama_model not in ollama_models and ollama_models != ["No models available"]:
+        selected_ollama_model = ollama_models[0] if ollama_models else ""
+    
+    app.ollama_model_var = ctk.StringVar(value=selected_ollama_model)
+    app.ollama_model_menu = ctk.CTkOptionMenu(ollama_config_frame, variable=app.ollama_model_var, values=ollama_models, width=180)
+    app.ollama_model_menu.pack(side="left", padx=(0,10), pady=(0,5))
+    
+    # Refresh button for Ollama models
+    def refresh_ollama_models():
+        if hasattr(app, 'ollama_manager'):
+            app.ollama_manager.detect_ollama()
+            ollama_models = []
+            if app.ollama_manager.is_available:
+                ollama_models = [model['name'] for model in app.ollama_manager.get_available_models()]
+            if not ollama_models:
+                ollama_models = ["No models available"]
+            app.ollama_model_menu.configure(values=ollama_models)
+            if ollama_models and ollama_models[0] != "No models available":
+                app.ollama_model_var.set(ollama_models[0])
+            print(f"Refreshed Ollama models: {ollama_models}")
+    
+    refresh_ollama_btn = ctk.CTkButton(ollama_config_frame, text="Refresh", width=60, command=refresh_ollama_models)
+    refresh_ollama_btn.pack(side="left", padx=(10,0), pady=(0,5))
+    
+    # Ollama status indicator
+    ollama_status_text = "Available" if hasattr(app, 'ollama_manager') and app.ollama_manager.is_available else "Not Available"
+    ollama_status_color = "#4CAF50" if hasattr(app, 'ollama_manager') and app.ollama_manager.is_available else "#FF6B6B"
+    app.ollama_status_label = ctk.CTkLabel(ollama_config_frame, text=f"Status: {ollama_status_text}", text_color=ollama_status_color)
+    app.ollama_status_label.pack(side="left", padx=(10,0), pady=(0,5))
 
     ctk.CTkLabel(models_frame, text="API Keys:", font=ctk.CTkFont(weight="bold")).pack(anchor="w", pady=(15,5))
     icon_size = (20, 20)
@@ -293,6 +357,7 @@ def save_settings_from_dialog(app):
     app.config["models_config"]["text_processing_service"] = app.service_var.get()
     app.config["models_config"]["mistral_model_name"] = app.mistral_model_var.get()
     app.config["models_config"]["gemini_model_name"] = app.gemini_model_var.get()
+    app.config["models_config"]["ollama_model_name"] = app.ollama_model_var.get()
     selected_display_language = app.language_var.get()
     app.config["language_config"]["target_language"] = app.language_display_to_code.get(selected_display_language, "en")
     app.config["audio_config"]["device"] = app.audio_device_var.get()
