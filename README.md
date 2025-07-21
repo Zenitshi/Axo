@@ -16,20 +16,24 @@ The application features a minimalist, draggable UI with real-time audio visuali
 ## Key Features
 
 *   **High-Quality Speech-to-Text:** Utilizes NVIDIA NeMo ASR (`parakeet-tdt-0.6b-v2`) for accurate transcription.
-*   **Intelligent Text Refinement (via Mistral AI):**
+*   **Intelligent Text Refinement (via Mistral AI & Gemini):**
     *   **Typer Mode:** Corrects ASR errors (stutters, misspellings), adds punctuation, translates to your target language, preserves original meaning and style, and formats lists (e.g., bullet points).
     *   **Prompt Engineer Mode:** Transforms your spoken ideas into well-structured XML prompts optimized for other advanced AI models (e.g., GPT-4, Gemini, Claude).
+    *   **Email Mode:** Transforms your spoken input into professionally formatted emails with proper structure, salutations, and closing.
 *   **Real-time Audio Visualization:** Engaging UI with a pulsing indicator and audio bars that react to your voice.
 *   **Minimalist & Draggable UI:** A small, always-on-top window that can be easily moved around your screen.
 *   **Global Hotkeys:**
     *   `Ctrl + Shift + Space`: Start/Stop recording.
     *   `Ctrl + Shift + H`: Open settings dialog.
 *   **Configuration Panel:**
-    *   Set API keys (Mistral, Gemini planned).
-    *   Choose operation mode (Typer, Prompt Engineer).
-    *   Select target language for output (English, Arabic, French, Spanish currently).
+    *   Set API keys (Mistral, Gemini).
+    *   Choose operation mode (Typer, Prompt Engineer, Email).
+    *   Select target language for output (16 languages supported including English, Arabic, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Hindi, Dutch, Polish, Turkish, Swedish).
+    *   Configure streaming options for real-time text processing.
+    *   Customize audio input device selection.
 *   **Clipboard & Auto-Paste:** Automatically copies the final text to your clipboard and attempts to paste it into your active window.
 *   **Audio Cues:** Optional sounds for recording start/stop (requires `pydub`).
+*   **Real-time Streaming:** View AI processing results as they are generated, token by token.
 *   **Customizable Appearance:** Leverages `customtkinter` themes for a modern look and feel.
 *   **Persistent Configuration:** Saves your settings in a `config.json` file.
 
@@ -163,18 +167,33 @@ Here are the estimated minimum and recommended specifications:
     {
       "api_keys": {
         "mistral": "YOUR_MISTRAL_API_KEY",
-        "gemini": ""
+        "gemini": "YOUR_GEMINI_API_KEY"
       },
       "models_config": {
-        "text_processing_service": "Mistral", // or "None"
-        "mistral_model_name": "mistral-medium-latest", // or other Mistral models
-        "gemini_model_name": "gemini-2.0-flash"
+        "text_processing_service": "Mistral", // "Mistral", "Gemini", or "None (Raw ASR)"
+        "mistral_model_name": "mistral-medium-latest",
+        "gemini_model_name": "gemini-2.0-flash",
+        "mistral_custom_models": ["mistral-large-latest"],
+        "gemini_custom_models": ["gemini-2.5-flash-preview-05-20"]
       },
       "language_config": {
-        "target_language": "en" // "es", "fr", "ar", etc.
+        "target_language": "en" // "es", "fr", "ar", "de", "it", "pt", "ru", "zh", "ja", "ko", "hi", "nl", "pl", "tr", "sv"
       },
       "mode_config": {
-        "operation_mode": "typer" // or "prompt_engineer"
+        "operation_mode": "typer" // "typer", "prompt_engineer", or "email"
+      },
+      "hotkey_config": {
+        "modifiers": ["ctrl", "shift"],
+        "key": "space"
+      },
+      "audio_config": {
+        "device": "Default"
+      },
+      "streaming_config": {
+        "enabled": true,
+        "confidence_threshold": 0.5,
+        "context_sensitivity": true,
+        "show_corrections": true
       }
     }
     ```
@@ -210,28 +229,25 @@ Here are the estimated minimum and recommended specifications:
 ### Current Features (Implemented)
 
 *   ✅ Core voice dictation using NVIDIA NeMo ASR.
-*   ✅ Text refinement and prompt engineering via Mistral AI integration.
-*   ✅ Two distinct operation modes: "Typer" and "Prompt Engineer".
+*   ✅ Text refinement and prompt engineering via Mistral AI and Gemini integration.
+*   ✅ Three distinct operation modes: "Typer", "Prompt Engineer", and "Email".
+*   ✅ **Email Mode:** Transform speech into professionally formatted emails with proper structure.
+*   ✅ **Real-time Streaming:** View AI processing results as they are generated, token by token.
+*   ✅ **Gemini Integration:** Full support for Google's Gemini models as text processing backend.
 *   ✅ Configurable target language for output.
 *   ✅ Global hotkeys for recording (`Ctrl+Shift+Space`) and settings (`Ctrl+Shift+H`).
-*   ✅ Settings UI for API keys, mode, and language selection.
+*   ✅ **Customizable Hotkeys:** Full hotkey customization through the settings UI.
+*   ✅ Settings UI for API keys, mode, language, streaming, and audio device selection.
+*   ✅ **Input Audio Device Selection:** Choose microphone input device from within the application.
+*   ✅ **Custom Model Selection:** Support for custom Mistral and Gemini model variants.
 *   ✅ Automatic clipboard copying and simulated paste of results.
 *   ✅ Optional audio cues for recording start/stop (requires `pydub`).
 *   ✅ Real-time audio input visualization.
 *   ✅ Draggable, always-on-top UI.
 *   ✅ Persistent configuration via `config.json`.
-*   ✅ **Gemini Integration:** Add support for Google's Gemini models as an alternative text processing backend. (New)
 
 ### Future Enhancements (Planned)
 
-*   ⬜️ **Email Mode:** Add new operation mode that write a clean email based on what you said.
-*   ⬜️ **Expanded Model Selection:**
-    *   Allow users to choose from a list of compatible ASR models.
-    *   Provide options for different Mistral/Gemini model versions (e.g., small, medium, large) for varying speed/accuracy/cost trade-offs.
-*   ⬜️ **Customizable Hotkeys:** Allow users to define their own global hotkeys through the settings UI.
-*   ⬜️ **Improved Project Structure & Modularity:** Refactor the codebase for better maintainability, testability, and separation of concerns (e.g., UI, core logic, services).
-*   ⬜️ **Enhanced Language Support:** Easily extendable list of target languages for translation and processing.
-*   ⬜️ **Advanced Error Handling & User Feedback:** More descriptive error messages and in-app notifications.
-*   ⬜️ **Input Audio Device Selection:** Allow users to choose the microphone input device from within the application.
-*   ⬜️ **"Type Directly" Mode:** An option to type directly into the application instead of pasting, for contexts where auto-paste might be problematic.
+*   ⬜️ **Expanded ASR Model Selection:** Allow users to choose from a list of compatible ASR models beyond the current Parakeet model.
+*   ⬜️ **Additional Language Support:** Continue expanding language options beyond the current 16 supported languages.
 *   ⬜️ **Packaging:** Create distributable executables for major OS (Windows, macOS, Linux).
