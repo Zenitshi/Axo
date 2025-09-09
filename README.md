@@ -9,13 +9,13 @@
 
 ## Description
 
-Axo is a desktop application designed to streamline your workflow by providing powerful voice dictation, intelligent text refinement, and AI prompt engineering capabilities. It listens to your voice, transcribes it using NVIDIA's NeMo ASR, and then leverages Large Language Models (currently Mistral AI) to correct, translate, or transform your speech into effective prompts for other AI systems.
+Axo is a desktop application designed to streamline your workflow by providing powerful voice dictation, intelligent text refinement, and AI prompt engineering capabilities. It listens to your voice, transcribes it using NVIDIA's NeMo ASR, and then leverages Large Language Models (currently Gemini, Mistral and Ollama models) to correct, translate, or transform your speech into effective prompts for other AI systems.
 
 The application features a minimalist, draggable UI with real-time audio visualization, global hotkeys for quick access, and a settings panel to customize its behavior. Whether you need to quickly type out thoughts, draft content in a specific language, or craft sophisticated prompts for advanced AI models, Axo aims to be your go-to assistant.
 
 ## Key Features
 
-*   **High-Quality Speech-to-Text:** Utilizes NVIDIA NeMo ASR (`parakeet-tdt-0.6b-v2`) for accurate transcription.
+*   **High-Quality Speech-to-Text:** Utilizes NVIDIA NeMo ASR (`nvidia/parakeet-tdt-0.6b-v3`) for accurate transcription.
 *   **Intelligent Text Refinement (via Mistral AI, Gemini & Ollama):**
     *   **Typer Mode:** Corrects ASR errors (stutters, misspellings), adds punctuation, translates to your target language, preserves original meaning and style, and formats lists (e.g., bullet points).
     *   **Prompt Engineer Mode:** Transforms your spoken ideas into well-structured XML prompts optimized for other advanced AI models (e.g., GPT-4, Gemini, Claude).
@@ -23,7 +23,7 @@ The application features a minimalist, draggable UI with real-time audio visuali
 *   **Real-time Audio Visualization:** Engaging UI with a pulsing indicator and audio bars that react to your voice.
 *   **Minimalist & Draggable UI:** A small, always-on-top window that can be easily moved around your screen.
 *   **Global Hotkeys:**
-    *   `Ctrl + Shift + Space`: Start/Stop recording.
+    *   `Ctrl + Shift + Space`: Start/Stop recording (customizable via settings).
     *   `Ctrl + Shift + H`: Open settings dialog.
     *   `Ctrl + Shift + X`: Toggle UI visibility (hide/show).
 *   **Configuration Panel:**
@@ -32,6 +32,7 @@ The application features a minimalist, draggable UI with real-time audio visuali
     *   Select target language for output (16 languages supported including English, Arabic, French, Spanish, German, Italian, Portuguese, Russian, Chinese, Japanese, Korean, Hindi, Dutch, Polish, Turkish, Swedish).
     *   Configure streaming options for real-time text processing.
     *   Customize audio input device selection.
+    *   Customize hotkeys through an intuitive capture system.
 *   **Clipboard & Auto-Paste:** Automatically copies the final text to your clipboard and attempts to paste it into your active window.
 *   **Audio Cues:** Optional sounds for recording start/stop (requires `pydub`).
 *   **Real-time Streaming:** View AI processing results as they are generated, token by token.
@@ -44,7 +45,7 @@ The application features a minimalist, draggable UI with real-time audio visuali
 2.  **Audio Capture:** Axo records audio from the microphone, displaying real-time visualizations.
 3.  **ASR Transcription:** The recorded audio is processed by the local NVIDIA NeMo ASR model to generate raw text.
 4.  **Text Processing (Optional):**
-    *   If a service like Mistral AI is configured and enabled:
+    *   If an AI service is configured and enabled:
         *   **Typer Mode:** The raw text is sent for correction, punctuation, translation, and light formatting.
         *   **Prompt Engineer Mode:** The raw text is interpreted to generate a structured XML prompt for another AI.
 5.  **Output:** The processed text is copied to the clipboard and an attempt is made to paste it into the currently active application.
@@ -102,7 +103,7 @@ Here are the estimated minimum and recommended specifications:
 
 **Important Notes for PC Specifications:**
 
-*   **NVIDIA GPU is Key for ASR Performance:** The `parakeet-tdt-0.6b-v2` model is optimized for NVIDIA GPUs. While it might technically run on a CPU or other GPUs, the transcription speed will be drastically slower, potentially making real-time or near real-time use frustrating.
+*   **NVIDIA GPU is Key for ASR Performance:** The `nvidia/parakeet-tdt-0.6b-v3` model is optimized for NVIDIA GPUs. While it might technically run on a CPU or other GPUs, the transcription speed will be drastically slower, potentially making real-time or near real-time use frustrating.
 *   **VRAM:** For the ASR model, sufficient VRAM on the GPU is crucial. The Parakeet 0.6B model is relatively small (~2.1GB VRAM needed), but more VRAM allows for potentially larger models in the future or smoother operation.
 *   **Mistral AI:** The requirements for Mistral AI are primarily internet-dependent.
 *   **Initial Setup:** Downloading the NeMo ASR model for the first time will require a good internet connection and some patience.
@@ -146,6 +147,15 @@ Here are the estimated minimum and recommended specifications:
     pyautogui
     pynput
     mistralai
+    google.generativeai
+    ollama
+    pillow
+    re
+    typing
+    threading
+    time
+    os
+    json
     # Optional for audio cues:
     # pydub
     # simpleaudio (or another pydub backend)
@@ -177,18 +187,25 @@ Here are the estimated minimum and recommended specifications:
         "gemini": "YOUR_GEMINI_API_KEY"
       },
       "models_config": {
-        "text_processing_service": "Mistral", // "Mistral", "Gemini", "Ollama", or "None (Raw ASR)"
+        "text_processing_service": "Gemini",
         "mistral_model_name": "mistral-medium-latest",
-        "gemini_model_name": "gemini-2.0-flash",
-        "ollama_model_name": "", // Local Ollama model (Blank unless you have downloaded a model)
-        "mistral_custom_models": ["mistral-large-latest"],
-        "gemini_custom_models": ["gemini-2.5-flash-preview-05-20"]
+        "gemini_model_name": "gemini-2.5-flash-lite-preview-06-17",
+        "ollama_model_name": "gemma3n",
+        "mistral_custom_models": [
+          "mistral-large-latest"
+        ],
+        "gemini_custom_models": [
+          "gemini-2.5-flash-preview-05-20",
+          "gemini-2.5-flash-lite-preview-06-17",
+          "gemini-2.5-flash"
+        ]
       },
       "language_config": {
-        "target_language": "en" // "es", "fr", "ar", "de", "it", "pt", "ru", "zh", "ja", "ko", "hi", "nl", "pl", "tr", "sv"
+        "target_language": "en",
+        "preserve_original_languages": true
       },
       "mode_config": {
-        "operation_mode": "typer" // "typer", "prompt_engineer", or "email"
+        "operation_mode": "typer"
       },
       "hotkey_config": {
         "modifiers": ["ctrl", "shift"],
@@ -198,7 +215,7 @@ Here are the estimated minimum and recommended specifications:
         "device": "Default"
       },
       "streaming_config": {
-        "enabled": true,
+        "enabled": false,
         "confidence_threshold": 0.5,
         "context_sensitivity": true,
         "show_corrections": true
@@ -255,8 +272,3 @@ Here are the estimated minimum and recommended specifications:
 *   ✅ Draggable, always-on-top UI.
 *   ✅ Persistent configuration via `config.json`.
 
-### Future Enhancements (Planned)
-
-*   ⬜️ **Expanded ASR Model Selection:** Allow users to choose from a list of compatible ASR models beyond the current Parakeet model.
-*   ⬜️ **Additional Language Support:** Continue expanding language options beyond the current 16 supported languages.
-*   ⬜️ **Packaging:** Create distributable executables for major OS (Windows, macOS, Linux).

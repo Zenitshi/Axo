@@ -11,8 +11,9 @@ import json
 import re
 from typing import Generator, Dict, Any, Optional, List
 import threading
+from .prompts import get_prompt_instructions, generate_dynamic_prompt as generate_prompt_template
 
-MODEL_NAME = "nvidia/parakeet-tdt-0.6b-v2"
+MODEL_NAME = "nvidia/parakeet-tdt-0.6b-v3" # "nvidia/parakeet-tdt-0.6b-v2"
 ASSETS_DIR = "assets"
 TEMP_AUDIO_FILENAME = os.path.join(ASSETS_DIR, "temp_axo_audio.wav")
 SAMPLE_RATE = 16000
@@ -79,201 +80,9 @@ def load_asr_model(app):
         print(f"Error loading ASR model: {e}"); app.current_state = "error_loading"
         app.master.after(0, app._update_ui_elements)
 
-def get_prompt_instructions(mode, language_code):
-    system_prompt_core = f"""
-You are an advanced AI assistant. Your primary task is to process raw speech-to-text transcription.
-Modern LLMs like you excel at understanding direct instructions. Be clear, concise, and accurate.
-First, meticulously correct any ASR errors (misspellings, stutters, phonetic mistakes, duplications).
-Then, ensure your entire output is in the target language: **{language_code}** (ISO 639-1 code).
-Preserve the original meaning and intent absolutely.
-Output ONLY the processed text in the target language, with no additional comments, conversational phrases, apologies, or self-references, unless the mode specifically dictates a structured output.
-"""
+# get_prompt_instructions function moved to backend/prompts.py
 
-    typer_mode_instructions = f"""
-CRITICAL INSTRUCTION: You are in 'Typer' mode. Your goal is to refine the provided ASR (Automatic Speech Recognition) transcript.
-Follow these principles strictly:
-
-1.  **ASR Correction:** Identify and correct common ASR errors. This includes:
-    *   Misspellings due to phonetic similarity (e.g., "too" vs. "to" vs. "two", "there" vs. "their" vs. "they're").
-    *   Stutters or repeated words (e.g., "I I I want" should become "I want"; "the the car" should become "the car").
-    *   Incorrect word segmentation if evident.
-    *   Punctuation: Add appropriate punctuation (periods, commas, question marks) to make the text readable and grammatically sound. Capitalize the beginning of sentences.
-
-2.  **Translation:** Ensure the final output is entirely in the target language: **{language_code}**. If the ASR transcript contains phrases from other languages, translate them.
-
-3.  **Meaning Preservation:** The corrected and translated text must retain the exact original meaning and intent of the speaker. Do NOT add new information or change the core message.
-
-4.  **Style Preservation (High Priority):**
-    *   If the original speech (once ASR errors are fixed) is already grammatically correct, natural-sounding, and clear in its phrasing and vocabulary for the target language **{language_code}**, **DO NOT ALTER IT.** Your role is to be a meticulous corrector and translator, not a stylistic rewriter.
-    *   Maintain the user's original style of speaking, sentence structure, and vocabulary if it's already good and appropriate for the target language. For example, if the user speaks informally, keep it informal (unless it's an ASR error).
-
-5.  **List Formatting:**
-    *   If the user's speech implies a list (e.g., using "firstly", "secondly", "then this, then that", or a sequence of related short statements), format these items as bullet points (using '• ') or a numbered list (e.g., '1. ') if the order is explicitly stated or clearly sequential.
-    *   Example (if target language is English): User says, "For the project, we need to define scope, then gather resources, and finally set a timeline."
-      Expected output:
-      + Define scope.
-      + Gather resources.
-      + Set a timeline.
-    *   Do not impose list formatting if it's not clearly implied.
-
-6.  **Conciseness:** Output only the refined text. No explanations, no apologies, no "Here's the refined text:". Just the text itself.
-"""
-
-    prompt_engineer_mode_instructions = f"""
-CRITICAL INSTRUCTION: You are in 'Prompt Engineer' mode. Your objective is to transform the user's spoken input into a highly effective, structured prompt for another advanced AI system (like GPT-4.1, Gemini 2.5 Pro, Claude 3.7, etc).
-The generated prompt MUST be in **{{language_code}}** and enclosed in a main `<Prompt>` XML tag, following the detailed structure below.
-
-**Core Principles to Apply (Think step-by-step for each section):**
-
-1.  **Deconstruct User Input:** Carefully analyze the user's raw ASR transcript to understand their core intent, the task they want the target AI to perform, key entities, desired output, and any implicit or explicit instructions.
-2.  **Adhere to Modern Prompting Best Practices:** Construct the prompt using the XML-delimited sections. These sections are based on proven strategies for guiding LLMs effectively.
-3.  **Clarity and Directness:** Instructions within the generated prompt should be clear, direct, and unambiguous. Modern LLMs follow direct instructions well.
-4.  **Negative Instructions:** Use negative instructions (e.g., "Do not include...") sparingly but appropriately if they clarify the task significantly.
-5.  **Sandwich Method for Critical Instructions:** If there are overriding critical instructions for the target AI, ensure they are mentioned early (e.g., in `<RoleAndObjective>` or `<Instructions>`) and reiterated in `<FinalInstructions>`.
-6.  **Chain-of-Thought (CoT) Encouragement:** Where appropriate, include a "Think step-by-step" instruction within the generated prompt's `<FinalInstructions>` or relevant instruction sections to guide the target AI's reasoning process.
-7.  **Conditional Tag Generation:** Only include an XML tag in the output if it contains specific, relevant content derived from the user's input. If a section like `<Examples>` or `<Constraints>` has no specific content to add (e.g., no relevant examples can be formulated, or no constraints are mentioned), then the entire XML tag for that section MUST be omitted from the generated prompt. Do not include tags with placeholder text like 'No examples provided.' or 'No constraints specified.' or similar statements indicating absence of content; instead, omit the tag itself.
-
-**Output Structure (Generate the prompt in this XML format):**
-
-```xml
-<Prompt>
-    <RoleAndObjective>
-        <!-- Define the persona the target AI should adopt and its primary goal/task. -->
-        <!-- Example: You are an expert Python programmer. Your objective is to write a function that... -->
-        <!-- Based on user input: [Analyze user's speech for role and objective] -->
-    </RoleAndObjective>
-
-    <Instructions>
-        <!-- Provide clear, step-by-step instructions for the target AI. -->
-        <!-- Use numbered lists if the order is important. -->
-        <!-- Example:
-        1. Read the provided <InputText>.
-        2. Identify all named entities.
-        3. Categorize each entity.
-        -->
-        <!-- Based on user input: [Extract and structure detailed instructions from user's speech] -->
-    </Instructions>
-
-    <InputData name="[A_descriptive_name_for_the_primary_input_if_applicable_e.g., MeetingTranscript, UserQuery, CodeSnippet]">
-        <!-- This section is for the actual data the target AI will process. -->
-        <!-- If the user's speech *is* the input data for the target AI, place the cleaned-up version of their speech here. -->
-        <!-- If the user is *describing* data that will be provided later, you might leave this section with a placeholder like "[PASTE USER'S DOCUMENT HERE]" or describe the expected input format. -->
-        <!-- For example, if user says "Summarize this document for me..." and then provides the document text, that text goes here. -->
-        <!-- If user says "I want you to write an email to John about the meeting", this section might be empty or describe what information the email should contain. If no direct input data is provided or described for the target AI, this tag MAY be omitted if it would be empty. -->
-        <!-- Based on user input: [Place or describe the primary input data here. If truly nothing, consider omitting the tag as per principle 7.] -->
-    </InputData>
-
-    <OutputFormat>
-        <!-- Specify precisely how the target AI's output should be structured. -->
-        <!-- Be very specific. e.g., "JSON format with keys 'name' and 'email'.", "A three-paragraph summary.", "Markdown list." -->
-        <!-- If the user specified an output format, reflect it here. If not, infer a suitable one or state "natural language". -->
-        <!-- Example: Provide the output as a JSON object with the keys "summary" and "action_items_list". -->
-        <!-- Based on user input: [Define the desired output structure] -->
-    </OutputFormat>
-
-    <Examples>
-        <!-- Provide 1-2 concise examples (few-shot) if it significantly clarifies the task or desired output style for the target AI. -->
-        <!-- This is especially useful for complex formatting or nuanced tasks. -->
-        <!-- If providing an example is not beneficial or no relevant example can be constructed from the user's request, this entire <Examples> tag MUST BE OMITTED. Do not include it with placeholder text. -->
-        <!-- Example (if the task was to extract names and roles):
-        <Example>
-            <Input>Text: "Alice is the project manager and Bob is the lead developer."</Input>
-            <Output>JSON: [ {{"name": "Alice", "role": "project manager"}}, {{"name": "Bob", "role": "lead developer"}} ]</Output>
-        </Example>
-        -->
-        <!-- Based on user input and task complexity: [Construct a relevant, simple example if beneficial. If not, OMIT THE ENTIRE <Examples> TAG.] -->
-    </Examples>
-
-    <Constraints>
-        <!-- List any constraints or things the target AI should avoid. -->
-        <!-- Example: Do not use technical jargon. The summary should not exceed 200 words. -->
-        <!-- Based on user input: [Identify and list any constraints. If no constraints are explicitly mentioned or clearly implied by the user's request, OMIT THE ENTIRE <Constraints> TAG.] -->
-    </Constraints>
-
-    <FinalInstructions>
-        <!-- Reiterate the most critical instructions, especially regarding the output format and core task. -->
-        <!-- Include a "Think step-by-step to ensure accuracy." or similar CoT prompt. -->
-        <!-- Example: Ensure the output strictly adheres to the specified <OutputFormat>. Double-check all extracted entities for accuracy. Think step-by-step. -->
-        <!-- Based on user input: [Reiterate key instructions and add CoT encouragement] -->
-    </FinalInstructions>
-</Prompt>
-```
-Your task:
-1. Correct ASR errors in the following raw transcript.
-2. Translate the corrected transcript fully into {language_code}.
-3. Based on the translated content, generate a complete, structured XML prompt according to the schema and principles outlined above.
-"""
-    email_mode_instructions = f"""
-Use code with caution.
-CRITICAL INSTRUCTION: You are in 'Email' mode. Your task is to transform the user's spoken input into a professionally formatted email.
-The entire email MUST be in the target language: {language_code}.
-Follow these steps meticulously:
-ASR Correction: First, carefully correct any errors in the provided ASR (Automatic Speech Recognition) transcript. This includes misspellings, stutters, repeated words, and phonetic mistakes. Ensure proper capitalization and punctuation for general readability before email formatting.
-Translation: Translate the corrected ASR transcript fully into the target language: {language_code}. All elements of the email must be in this language.
-Email Structure - Infer and Generate:
-Subject Line: Based on the user's speech, create a concise and informative subject line. Prefix it with "Subject: ".
-Salutation:
-If the user mentions a recipient's name (e.g., "write an email to John," "tell Sarah that..."), use a formal or semi-formal salutation like "Dear John," or "Hi Sarah,".
-If no recipient is clearly identified, use a generic salutation like "Dear Team," "To Whom It May Concern," or a contextually appropriate greeting. If a very casual interaction is implied, a simple "Hi," might be acceptable.
-Email Body:
-Transform the core message from the user's speech into clear, well-structured paragraphs.
-Maintain the original intent and key information.
-Use polite and professional language appropriate for an email.
-If the user implies a list or bullet points, format them clearly within the body (e.g., using hyphens '-' or asterisks '* ').
-Closing: Provide a standard professional closing (e.g., "Sincerely,", "Best regards,", "Regards,").
-Sender's Name (Optional Placeholder): If the user doesn't explicitly state their name for the signature, you can add a placeholder like "[Your Name]" after the closing. If the context strongly implies anonymity or the sender is obvious, you might omit this.
-Formatting and Conciseness:
-The final output should be ONLY the complete email text, ready to be pasted.
-Do NOT include any of your own conversational phrases, comments, apologies, or self-references (e.g., "Here is the email:", "I have drafted an email for you:").
-Ensure there's a blank line between the subject, salutation, each paragraph in the body, the closing, and the sender's name placeholder (if used).
-Example (if target language is English and user says "draft an email to marketing about the new campaign launch next week, tell them to prepare the press release and social media posts"):
-Subject: New Campaign Launch Next Week
-Dear Marketing Team,
-I hope this email finds you well.
-This is to inform you about the new campaign scheduled to launch next week. Please begin preparations for the following:
-Press release
-Social media posts
-Please let me know if you have any questions.
-Best regards,
-[Your Name]
-Your task is to apply these instructions to the ASR transcript provided below.
-"""
-
-    if mode == "typer":
-        return system_prompt_core, typer_mode_instructions
-    elif mode == "prompt_engineer":
-        return system_prompt_core, prompt_engineer_mode_instructions
-    elif mode == "email":
-        return system_prompt_core, email_mode_instructions
-    else: # Default to typer
-        return system_prompt_core, typer_mode_instructions
-
-def generate_dynamic_prompt(operation_mode: str, text: str, language_code: str) -> str:
-    """
-    Generate a dynamic prompt for streaming text processing based on operation mode.
-    
-    Args:
-        operation_mode: The operation mode (typer, prompt_engineer, email)
-        text: The transcribed text to process
-        language_code: Target language code
-    
-    Returns:
-        Complete prompt string for the LLM
-    """
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
-    user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
-    
-    # Create the complete prompt
-    complete_prompt = f"""{system_prompt}
-
-{mode_instructions}
-
-{user_content_header}
-{text}
-{user_content_footer}"""
-    
-    return complete_prompt
+# generate_dynamic_prompt function moved to backend/prompts.py
 
 def process_text_with_mistral(app, text):
     if not app.mistral_client:
@@ -285,10 +94,17 @@ def process_text_with_mistral(app, text):
     print("Refining text with Mistral...")
     model_name = app.config.get("models_config", {}).get("mistral_model_name", DEFAULT_MISTRAL_MODEL_NAME)
     language_code = app.config.get("language_config", {}).get("target_language", "en")
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
     mode = app.config.get("mode_config", {}).get("operation_mode", "typer")
 
-    system_prompt, mode_instructions = get_prompt_instructions(mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    system_prompt, mode_instructions = get_prompt_instructions(mode, language_code, preserve_original_languages)
+    
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     messages = [
         {"role": "system", "content": system_prompt},
@@ -345,10 +161,17 @@ def process_text_with_gemini(app, text):
     print(f"Refining text with Gemini (Model: {selected_gemini_model_name})...")
 
     language_code = app.config.get("language_config", {}).get("target_language", "en")
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
     mode = app.config.get("mode_config", {}).get("operation_mode", "typer")
 
-    system_prompt, mode_instructions = get_prompt_instructions(mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    system_prompt, mode_instructions = get_prompt_instructions(mode, language_code, preserve_original_languages)
+    
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     full_prompt_text = f"{system_prompt}\n\n{mode_instructions}\n\n{user_content_header}\n{text}\n{user_content_footer}"
 
@@ -504,8 +327,15 @@ def stream_mistral_text_processing(app, text: str, operation_mode: str) -> Gener
     
     # Generate prompt based on operation mode
     language_code = app.config.get("language_config", {}).get("target_language", "en")
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages)
+    
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     
     messages = [
@@ -646,8 +476,15 @@ def stream_gemini_text_processing(app, text: str, operation_mode: str) -> Genera
     
     # Generate prompt based on operation mode
     language_code = app.config.get("language_config", {}).get("target_language", "en")
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages)
+    
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     
     complete_prompt = f"""{system_prompt}
@@ -833,8 +670,15 @@ def stream_ollama_text_processing(app, text: str, operation_mode: str) -> Genera
     
     # Generate prompt based on operation mode
     language_code = app.config.get("language_config", {}).get("target_language", "en")
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages)
+    
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     
     full_prompt = f"{system_prompt}\n\n{mode_instructions}\n\n{user_content_header}\n{text}\n{user_content_footer}"
@@ -882,13 +726,19 @@ def process_text_with_ollama(app, text: str) -> str:
     
     operation_mode = app.config.get("mode_config", {}).get("operation_mode", "typer")
     language_code = app.config.get("language_config", {}).get("target_language", "en")
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code)
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages)
     
     ollama_model = app.config.get("models_config", {}).get("ollama_model_name", "")
     if not ollama_model:
         return "Error: No Ollama model selected"
     
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION (to be processed into target language: {language_code}) ---"
+    if preserve_original_languages:
+        header_note = "to be processed while preserving original languages"
+    else:
+        header_note = f"to be processed into target language: {language_code}"
+    
+    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
     user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
     
     full_prompt = f"{system_prompt}\n\n{mode_instructions}\n\n{user_content_header}\n{text}\n{user_content_footer}"

@@ -17,7 +17,7 @@ def load_config():
             "mistral_custom_models": [],
             "gemini_custom_models": []
         },
-        "language_config": {"target_language": "en"},
+        "language_config": {"target_language": "en", "preserve_original_languages": True},
         "mode_config": {"operation_mode": "typer"},
         "hotkey_config": {"modifiers": ["ctrl", "shift"], "key": "space"},
         "audio_config": {"device": "Default"},

@@ -205,6 +205,16 @@ def open_settings_dialog(app):
     lang_menu = ctk.CTkOptionMenu(language_frame, variable=app.language_var, values=list(app.language_display_to_code.keys()))
     lang_menu.pack(fill="x", pady=(0,10))
 
+    # Language Preservation Option
+    preserve_original_languages = app.config.get("language_config", {}).get("preserve_original_languages", True)
+    app.preserve_original_languages_var = ctk.BooleanVar(value=preserve_original_languages)
+    preserve_checkbox = ctk.CTkCheckBox(language_frame, text="Preserve original languages (disable translation)", variable=app.preserve_original_languages_var)
+    preserve_checkbox.pack(anchor="w", pady=(5,5))
+    
+    # Add explanatory text
+    explanation_text = "When enabled: AI corrects ASR errors but keeps original language mix (e.g., French + English)\nWhen disabled: AI translates everything to the selected output language"
+    ctk.CTkLabel(language_frame, text=explanation_text, font=("Arial", 11), text_color="gray").pack(anchor="w", pady=(0,10))
+
     # Audio Tab
     audio_frame = ctk.CTkFrame(tab_audio, fg_color="transparent")
     audio_frame.pack(pady=10, padx=10, fill="x")
@@ -360,6 +370,7 @@ def save_settings_from_dialog(app):
     app.config["models_config"]["ollama_model_name"] = app.ollama_model_var.get()
     selected_display_language = app.language_var.get()
     app.config["language_config"]["target_language"] = app.language_display_to_code.get(selected_display_language, "en")
+    app.config["language_config"]["preserve_original_languages"] = app.preserve_original_languages_var.get()
     app.config["audio_config"]["device"] = app.audio_device_var.get()
     app.config["streaming_config"]["enabled"] = app.streaming_enabled_var.get()
     app.config["streaming_config"]["confidence_threshold"] = app.confidence_threshold_var.get()
