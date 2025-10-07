@@ -13,6 +13,7 @@ def get_system_prompt_core(language_instruction):
     return f"""You are an advanced AI assistant. Your primary task is to process raw speech-to-text transcription.
 Modern LLMs like you excel at understanding direct instructions. Be clear, concise, and accurate.
 First, meticulously correct any ASR errors (misspellings, stutters, phonetic mistakes, duplications).
+**Remove any filler words like "um", "uh", "ah", etc.**
 {language_instruction}
 Preserve the original meaning and intent absolutely.
 Output ONLY the processed text, with no additional comments, conversational phrases, apologies, or self-references, unless the mode specifically dictates a structured output."""
@@ -55,7 +56,8 @@ Follow these principles strictly:
     *   If the original speech (once ASR errors are fixed) is already grammatically correct, natural-sounding, and clear in its phrasing and vocabulary, **DO NOT ALTER IT.** Your role is to be a meticulous corrector, not a stylistic rewriter.
     *   Maintain the user's original style of speaking, sentence structure, and vocabulary if it's already good and appropriate. For example, if the user speaks informally, keep it informal (unless it's an ASR error).
 
-5.  **List Formatting:**
+5.  **Paragraph and List Formatting:**
+    *   **Structure the text into logical paragraphs.** A new paragraph should be started when the topic changes.
     *   If the user's speech implies a list (e.g., using "firstly", "secondly", "then this, then that", or a sequence of related short statements), format these items as bullet points (using '• ') or a numbered list (e.g., '1. ') if the order is explicitly stated or clearly sequential.
     *   Example: User says, "For the project, we need to define scope, then gather resources, and finally set a timeline."
       Expected output:
@@ -64,7 +66,28 @@ Follow these principles strictly:
       • Set a timeline.
     *   Do not impose list formatting if it's not clearly implied.
 
-6.  **Conciseness:** Output only the refined text. No explanations, no apologies, no "Here's the refined text:". Just the text itself."""
+6.  **Code Formatting:**
+    *   If the user mentions programming languages (e.g., "Python", "JavaScript"), file paths (e.g., "C:/Users/user/Documents"), or other technical terms, format them as inline code using backticks. For example, `python` or `C:/Users/user/Documents`.
+
+7.  **Project Structure Formatting:**
+    *   If the user describes a file/folder structure or project layout, format it as a clean tree structure using proper indentation and symbols (├──, └──, │).
+    *   Example: If user says "root folder has test.py, main.py, weakness.db and a jsons folder with templates1.json, templates2.json, templates3.json", format as:
+      ```
+      root/
+      ├── test.py
+      ├── main.py
+      ├── weakness.db
+      └── jsons/
+          ├── templates1.json
+          ├── templates2.json
+          └── templates3.json
+      ```
+
+8.  **Self-Correction Processing:**
+    *   If the user corrects themselves using phrases like "wait", "my bad", "actually", "I meant", identify the correction and output only the final, corrected version.
+    *   Example: If user says "Gemini is better than all AI models. Wait, my bad, I meant all models are better than Gemini" → output only "all models are better than Gemini".
+
+9.  **Conciseness:** Output only the refined text. No explanations, no apologies, no "Here's the refined text:". Just the text itself."""
 
 def get_prompt_engineer_mode_instructions(language_code, preserve_original_languages=False):
     """Get instructions for Prompt Engineer mode."""
@@ -212,21 +235,30 @@ Best regards,
 
 Your task is to apply these instructions to the ASR transcript provided below."""
 
-def get_prompt_instructions(mode, language_code, preserve_original_languages=False):
+def get_prompt_instructions(mode, language_code, preserve_original_languages=False, target_language=None):
     """
     Get the appropriate system prompt and mode instructions.
-    
+
     Args:
-        mode: Operation mode ('typer', 'prompt_engineer', 'email')
+        mode: Operation mode ('typer', 'prompt_engineer', 'email', 'coder')
         language_code: Target language code (ISO 639-1)
         preserve_original_languages: Whether to preserve original languages
-    
+        target_language: Target programming language for coder mode
+
     Returns:
         Tuple of (system_prompt, mode_instructions)
     """
+    if mode == "coder":
+        # For coder mode, use specialized prompts
+        language_instruction = f"Generate code in {target_language or 'Python'}."
+        system_prompt = get_coder_mode_system_prompt(language_instruction)
+        mode_instructions = get_coder_mode_instructions(target_language or 'Python', preserve_original_languages)
+        return system_prompt, mode_instructions
+
+    # For other modes, use the existing logic
     language_instruction = get_language_instruction(language_code, preserve_original_languages)
     system_prompt_core = get_system_prompt_core(language_instruction)
-    
+
     if mode == "typer":
         mode_instructions = get_typer_mode_instructions(language_code, preserve_original_languages)
     elif mode == "prompt_engineer":
@@ -235,39 +267,122 @@ def get_prompt_instructions(mode, language_code, preserve_original_languages=Fal
         mode_instructions = get_email_mode_instructions(language_code, preserve_original_languages)
     else:  # Default to typer
         mode_instructions = get_typer_mode_instructions(language_code, preserve_original_languages)
-    
+
     return system_prompt_core, mode_instructions
 
-def generate_dynamic_prompt(operation_mode: str, text: str, language_code: str, preserve_original_languages: bool = False) -> str:
+def generate_dynamic_prompt(operation_mode: str, text: str, language_code: str, preserve_original_languages: bool = False, target_language: str = None) -> str:
     """
     Generate a dynamic prompt for streaming text processing based on operation mode.
-    
+
     Args:
-        operation_mode: The operation mode (typer, prompt_engineer, email)
+        operation_mode: The operation mode (typer, prompt_engineer, email, coder)
         text: The transcribed text to process
         language_code: Target language code
         preserve_original_languages: Whether to preserve original languages
-    
+        target_language: Target programming language for coder mode
+
     Returns:
         Complete prompt string for the LLM
     """
-    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages)
-    
-    if preserve_original_languages:
-        header_note = "to be processed while preserving original languages"
+    system_prompt, mode_instructions = get_prompt_instructions(operation_mode, language_code, preserve_original_languages, target_language)
+
+    if operation_mode == "coder":
+        # For coder mode, simpler prompt structure
+        complete_prompt = f"""{system_prompt}
+
+{mode_instructions}
+
+User request: {text}"""
     else:
-        header_note = f"to be processed into target language: {language_code}"
-    
-    user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
-    user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
-    
-    # Create the complete prompt
-    complete_prompt = f"""{system_prompt}
+        # For other modes, use the existing structure
+        if preserve_original_languages:
+            header_note = "to be processed while preserving original languages"
+        else:
+            header_note = f"to be processed into target language: {language_code}"
+
+        user_content_header = f"--- BEGIN RAW ASR TRANSCRIPTION ({header_note}) ---"
+        user_content_footer = "--- END RAW ASR TRANSCRIPTION ---"
+
+        # Create the complete prompt
+        complete_prompt = f"""{system_prompt}
 
 {mode_instructions}
 
 {user_content_header}
 {text}
 {user_content_footer}"""
-    
+
     return complete_prompt
+
+def get_coder_mode_instructions(target_language: str, preserve_original_languages: bool = False) -> str:
+    """Get instructions for Coder mode - translates natural language to code."""
+
+    language_instruction = f"""Target Language: {target_language}
+- Use modern {target_language} syntax and best practices
+- Follow language-specific naming conventions
+- Include appropriate imports/modules
+- Implement proper error handling where relevant"""
+
+    return f"""CRITICAL INSTRUCTION: You are in 'Coder' mode. Your task is to translate the user's natural language description into working, production-ready {target_language} code.
+
+{language_instruction}
+
+CODE GENERATION PRINCIPLES:
+1. **Direct Translation:** Convert the spoken description directly into functional code. Focus on the core functionality described.
+
+2. **Language-Specific Implementation:**
+   - Python: Use type hints, modern syntax (3.8+), descriptive variable names
+   - TypeScript: Include proper types, interfaces, modern ES features
+   - Go: Follow Go conventions, proper error handling, idiomatic patterns
+   - JavaScript: Use modern ES6+, consider both Node.js and browser contexts
+
+3. **Code Structure:**
+   - Include necessary imports at the top
+   - Add clear function/class names based on the description
+   - Implement the described functionality completely
+   - Add brief comments only for complex logic
+
+4. **Constraints & Scope:**
+   - Implement ONLY what's explicitly described - no extra features
+   - Keep implementations simple and focused
+   - Use standard library functions where appropriate
+   - Avoid over-engineering or unnecessary complexity
+
+5. **Knowledge Limitations:**
+   - Be aware of your training data cutoff and knowledge limitations
+   - If asked about packages/libraries/versions beyond your knowledge, explicitly state "I don't have information about [package/library] as my knowledge only goes up to [cutoff date]"
+   - Only provide code using well-established, documented packages and libraries
+   - Do not hallucinate or invent package names, APIs, or functionality
+   - For unknown packages: "I don't have information about [unknown package]. Please specify a different approach using established libraries."
+
+6. **Output Format:**
+   - Return ONLY the complete code
+   - Include proper file extensions and basic structure
+   - No explanations or conversational text
+   - Ready-to-run code with all dependencies
+
+7. **Error Handling:**
+   - Add basic error handling for common edge cases
+   - Use language-appropriate error patterns
+   - Don't add excessive defensive programming
+
+EXAMPLE WORKFLOW:
+User says: "Create a Python function that calculates the average of a list of numbers"
+Output:
+```python
+from typing import List
+
+def calculate_average(numbers: List[float]) -> float:
+    if not numbers:
+        return 0.0
+    return sum(numbers) / len(numbers)
+```"""
+
+def get_coder_mode_system_prompt(language_instruction):
+    """Get the core system prompt with language handling instruction for coder mode."""
+    return f"""You are an advanced AI assistant specialized in code generation. Your primary task is to process natural language descriptions and convert them into working, production-ready code.
+Modern LLMs like you excel at understanding direct instructions for code generation. Be clear, concise, and accurate in your code output.
+First, meticulously understand the user's intent and translate it into functional code.
+{language_instruction}
+Preserve the original meaning and intent absolutely.
+Output ONLY the complete code, with no additional comments, conversational phrases, apologies, or self-references, unless the mode specifically dictates a structured output."""

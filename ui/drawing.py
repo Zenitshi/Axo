@@ -3,6 +3,12 @@ import math
 import numpy as np
 
 def update_ui_elements(app):
+    # Check if modern UI is active
+    if hasattr(app, 'modern_ui') and app.modern_ui is not None:
+        app.modern_ui.update_state_from_app()
+        return
+
+    # Default UI updates
     if not app.master.winfo_exists() or not app.drawing_canvas.winfo_exists(): return
     app.drawing_canvas.delete("all"); app.master.update_idletasks()
     if not app.is_window_visible: return

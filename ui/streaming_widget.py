@@ -386,10 +386,22 @@ class StreamingWidget:
                     self.streaming_frame.update_idletasks()
                     
             elif data_type == "final":
+                # Display final content if this is the first final message
+                if not self.first_token_received:
+                    self.text_widget.delete("1.0", tk.END)
+                    self.first_token_received = True
+
+                if content:
+                    self.accumulated_text += content
+                    self.text_widget.insert(tk.END, content)
+                    self.text_widget.see(tk.END)
+                    # Force the UI to update
+                    self.streaming_frame.update_idletasks()
+
                 # Mark streaming as complete
                 if self.confidence_indicator:
                     self.confidence_indicator.configure(
-                        text="● Complete", 
+                        text="● Complete",
                         text_color="#4CAF50"
                     )
                 self.is_streaming = False
