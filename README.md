@@ -99,13 +99,7 @@ The following table provides optimized model recommendations for different opera
    cd Axo
    ```
 
-2. **Create Virtual Environment (Recommended):**
-   ```bash
-   python -m venv venv
-   source venv/bin/activate  # On Windows: venv\Scripts\activate
-   ```
-
-3. **Install Dependencies:**
+2. **Install Dependencies:**
    ```bash
    pip install customtkinter nemo_toolkit[asr] sounddevice numpy wave pyperclip pyautogui pynput mistralai google-generativeai ollama pillow cryptography
    ```
@@ -278,4 +272,5 @@ This provides a seamless, one-click experience tailored to your specific folder 
 - ✅ Persistent encrypted configuration
 
 ### Future Enhancements 🚀
+
 - Database that stores sessions.
