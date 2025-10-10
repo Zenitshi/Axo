@@ -122,11 +122,11 @@ The following table provides optimized model recommendations for different opera
 
 </details>
 
-4. **Security Setup:**
+3. **Security Setup:**
    - First run will prompt for a master password to encrypt API keys
    - API keys are encrypted using Fernet encryption with PBKDF2 key derivation
 
-5. **Configure Axo:**
+4. **Configure Axo:**
    - Run `Axo.py` or `Axo.bat` (Windows)
    - Press `Ctrl + Shift + H` to open settings
    - Configure operation mode, target language, and programming language (for Coder mode)
@@ -274,3 +274,4 @@ This provides a seamless, one-click experience tailored to your specific folder 
 ### Future Enhancements 🚀
 
 - Database that stores sessions.
+
