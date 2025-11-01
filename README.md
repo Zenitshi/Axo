@@ -12,6 +12,10 @@ Axo is a desktop application designed to streamline your workflow by providing p
 
 The application features a sophisticated modern UI with real-time audio visualization, global hotkeys for quick access, and an enhanced settings panel. Whether you need to quickly type out thoughts, draft content in a specific language, craft sophisticated prompts for advanced AI models, or generate code from natural language descriptions, Axo aims to be your go-to assistant.
 
+<p>
+ <img width="640" height="459" alt="image" src="https://github.com/user-attachments/assets/5ef14bb4-5869-4f64-8a8f-58cdef9c34b8" />
+</p>
+
 ## Key Features
 
 *   **High-Quality Speech-to-Text:** Utilizes NVIDIA NeMo ASR (`nvidia/parakeet-tdt-0.6b-v3`) for accurate transcription.
@@ -274,4 +278,5 @@ This provides a seamless, one-click experience tailored to your specific folder 
 ### Future Enhancements 🚀
 
 - Database that stores sessions.
+
 
